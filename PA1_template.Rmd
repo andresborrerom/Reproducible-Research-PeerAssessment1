@@ -159,6 +159,8 @@ avg_int_wd_we <- sqldf("select num_day, interval, avg(steps) from pa1_w group by
 head(avg_int_wd_we,5)
 
 head(avg_int_wd_we[,2],5)
-xyplot(avg_int_wd_we[,3]~avg_int_wd_we[,2]|avg_int_wd_we[,1], xlab = "intervals", ylab = "average steps")
+xyplot(avg_int_wd_we[,3]~avg_int_wd_we[,2]|avg_int_wd_we[,1], xlab = "Interval", ylab = "Number of Steps")
 
 ```
+
+## The End
