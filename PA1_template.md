@@ -304,9 +304,11 @@ head(avg_int_wd_we[, 2], 5)
 ```
 
 ```r
-xyplot(avg_int_wd_we[, 3] ~ avg_int_wd_we[, 2] | avg_int_wd_we[, 1], xlab = "intervals", 
-    ylab = "average steps")
+xyplot(avg_int_wd_we[, 3] ~ avg_int_wd_we[, 2] | avg_int_wd_we[, 1], xlab = "Interval", 
+    ylab = "Number of Steps")
 ```
 
 ![plot of chunk avg_interval_weekday_weekend](figure/avg_interval_weekday_weekend.png) 
 
+
+## The End
