@@ -1,0 +1,164 @@
+PEER ASSESSMENT 1 REPRODUCIBLE RESEARCH
+========================================================
+
+I will first set echo to TRUE so I won't have to do it each time I create a chunk in r. 
+
+``` {r setoptions, echo = TRUE}
+opts_chunk$set(echo = TRUE)
+
+```
+
+
+Libraries to call:
+
+``` {r}
+library(sqldf)
+library(lattice)
+```
+### Loading and Preprocessing the data
+
+I will get the data online, on a zip file. I create a temp file to save the zip, and then unzip it and read it into 'pa1'. Show first 5 rows of pa1 to check. Set field steps to numeric.
+
+```{r getdata, cache=TRUE}
+setInternet2(TRUE)
+temp <- tempfile()
+download.file("https://github.com/andresborrerom/RepData_PeerAssessment1/raw/master/activity.zip",temp)
+pa1 <- read.csv(unz(temp, "activity.csv"))
+pa1$steps <- as.numeric(pa1$steps)
+head(pa1,5)
+unlink(temp)
+```
+
+### What is mean total number of steps taken per day?
+
+1. Histogram total steps.   
+Using SQLDF I will sum steps by unique dates, and then plot a histogram.
+
+```{r plothistogramsteps, fig.height=5, fig.width= 5}
+stepsbydate <- sqldf("select date, sum(steps) from pa1 group by date", drv = "SQLite")
+stepsbydate[,"sum(steps)"] <- as.numeric(stepsbydate[,"sum(steps)"])
+hist( stepsbydate[,"sum(steps)"],7)
+```
+
+2. Calculate mean and median
+
+```{r mean_and_median}
+promedio <- mean(stepsbydate[,"sum(steps)"], na.rm = TRUE)
+mediana <- median(stepsbydate[,"sum(steps)"], na.rm = TRUE)
+```
+
+The mean is `r promedio`. 
+The median is `r mediana`. 
+
+
+### What is the average daily activity pattern?
+
+I create a matrix with interval in column 1 and the steps averaged by date in column 2. Then I plot it with x-axis the interval.
+
+```{r fig.height = 4}
+meaninterval <- sqldf("select interval, avg(steps) from pa1 group by interval", drv = "SQLite")
+plot(meaninterval)
+```
+
+``` {r intervalmaxsteps}
+m <- subset(meaninterval, meaninterval[,2] == max(meaninterval[,2]))
+
+```
+
+The interval with the maximum steps average is `r m$interval`
+
+
+### Imputing missing values
+
+
+
+``` {r}
+p <- subset(pa1, is.na(pa1$steps))
+
+```
+
+1. Total number of rows with NAs: `r nrow(p)`
+
+My strategy for imputting missing values is to group the steps by interval and day of the week (1 through 7). I will imput the mean of these groups into the missing values. 
+
+First I will create the new column weekday (values 1:7): 
+
+``` {r daycolumn, cache = TRUE}
+num_day <- matrix(rep(0, nrow(pa1)),nrow(pa1),1)
+num_day <- data.frame(num_day)
+pa1_w <- cbind(pa1,num_day)
+day = 0
+for (i in 1:nrow(pa1)){
+  if(pa1_w$interval[i] == 0){
+    if(day < 7) day = day +1
+    else day = 1
+  }
+  pa1_w$num_day[i] <- day
+}
+pa1_w[2000:2020,]
+
+```
+
+Now,  I will replace the NAs with the mean of the same interval and weekday, ignoring NAs. Then I will imput the values where missing. 
+
+```{r imputvalues, cache=TRUE}
+avg_wd_int <- sqldf("select interval, num_day, avg(steps) from pa1_w group by interval,num_day", drv = "SQLite")
+
+head(avg_wd_int,10)
+for (i in 1:nrow(pa1_w)){
+  if(is.na(pa1_w$steps[i])){
+    temporal <- subset(avg_wd_int, avg_wd_int$num_day == pa1_w$num_day[i] & 
+                         avg_wd_int$interval == pa1_w$interval[i])
+    pa1_w$steps[i]<-temporal[,"avg(steps)"] 
+  }  
+}
+
+head(pa1_w,5)
+```
+
+(Above: New data set with missing values filled in (head)).
+
+Calculate total steps per day:
+```{r plothistogramsteps2, fig.height=5, fig.width= 5}
+stepsbydate2 <- sqldf("select date, sum(steps) from pa1_w group by date", drv = "SQLite")
+stepsbydate2[,"sum(steps)"] <- as.numeric(stepsbydate2[,"sum(steps)"])
+hist( stepsbydate2[,"sum(steps)"],7)
+```
+
+2. Calculate mean and median
+
+```{r mean_and_median_2}
+promedio2 <- mean(stepsbydate2[,"sum(steps)"], na.rm = FALSE)
+mediana2 <- median(stepsbydate2[,"sum(steps)"], na.rm = FALSE)
+```
+
+The mean of the new with filled in data is `r promedio2`. 
+The median of the new with filled in data is `r mediana2`. 
+ 
+Taking this new calculated data, we have aproximately **`r round(promedio2 - promedio,0)`** more steps in average per day, and a greater median by **`r round(mediana2 - mediana,0)`** steps.
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+I can use my new column created numday to be the division weekday or weekend. Because 2012-10-01 was Monday, and I have it as numday = 1,   weekends will be where numday = 6 or 7. 
+
+```{r weekday_or_weekend, cache = TRUE}
+for (i in 1:nrow(pa1_w)){
+  if(pa1_w$num_day[i] == 6 | pa1_w$num_day[i] == 7) pa1_w$num_day[i] = "weekend"
+  else pa1_w$num_day[i] = "weekday"
+}
+
+pa1_w[1438:1445,]
+```
+
+Now, create with SQL commands, a data frame with the average number of steps taken per interval when weekday and when weekend.
+
+```{r avg_interval_weekday_weekend, fig.width = 10}
+avg_int_wd_we <- sqldf("select num_day, interval, avg(steps) from pa1_w group by interval, num_day", drv     = "SQLite")
+
+
+head(avg_int_wd_we,5)
+
+head(avg_int_wd_we[,2],5)
+xyplot(avg_int_wd_we[,3]~avg_int_wd_we[,2]|avg_int_wd_we[,1], xlab = "intervals", ylab = "average steps")
+
+```
